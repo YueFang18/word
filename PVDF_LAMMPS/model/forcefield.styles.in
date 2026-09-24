@@ -1,0 +1,4 @@
+# REQUIRED: replace with the styles and special_bonds of YOUR validated force field.
+# See examples below. There is deliberately no invented PVDF parameter set.
+print "MODEL NOT CONFIGURED: replace model/forcefield.styles.in; see model/README.md"
+quit 1

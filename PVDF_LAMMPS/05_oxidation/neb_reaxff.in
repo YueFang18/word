@@ -1,0 +1,27 @@
+# OPTIONAL same-charge potential-energy barrier only, NOT an electrochemical oxidation barrier.
+# Example: mpirun -np 8 lmp -partition 8x1 -in 05_oxidation/neb_reaxff.in ...
+# Requires REPLICA+REAXFF packages, minimized start.data, final coordinates with same IDs.
+variable validated_reaxff index no
+if "${validated_reaxff} != yes" then "print 'Validate reaction energies and barriers against QM first'" "quit 1"
+variable data index model/reaxff_start.data
+variable finalcoords index model/neb_final.coords
+variable reax_coeffs index model/reaxff.coeffs.in
+variable Kneb index 1.0
+units real
+atom_style charge
+atom_modify map array
+boundary p p p
+pair_style reaxff NULL
+read_data ${data}
+include ${reax_coeffs}
+neighbor 2.0 bin
+neigh_modify every 1 delay 0 check yes
+fix qeq all qeq/reaxff 1 0.0 10.0 1.0e-6 reaxff
+fix band all neb ${Kneb}
+min_style quickmin
+timestep 0.1
+thermo 100
+neb 1.0e-8 1.0e-4 20000 20000 100 final ${finalcoords}
+# Read replica energies from log; use (Emax-Estart)*0.0433641042 for eV.
+# Repeat images, force tolerance and initial pathway; no dynamics during NEB.
+quit 0

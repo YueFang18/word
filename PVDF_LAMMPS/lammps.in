@@ -1,0 +1,11 @@
+# Run from this package root: lmp -in lammps.in -var task adhesion ...
+variable task index help
+if "${task} == equilibrate" then "jump 00_equilibrate/lammps.in"
+if "${task} == adhesion" then "jump 01_adhesion/lammps.in"
+if "${task} == mechanics" then "jump 02_mechanics/lammps.in"
+if "${task} == rheology" then "jump 03_rheology/lammps.in"
+if "${task} == transport" then "jump 04_transport/lammps.in"
+if "${task} == oxidation" then "jump 05_oxidation/lammps.in"
+if "${task} == reaxff" then "jump 05_oxidation/reaxff.in"
+print "Choose task: equilibrate adhesion mechanics rheology transport oxidation reaxff. Read README.md first."
+if "${task} != help" then "quit 1"

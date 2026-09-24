@@ -1,0 +1,100 @@
+# Slab: x/y periodic, z nonperiodic. Orthogonal box, neutral system, vacuum padding.
+# Modes: equilibrium, pull_normal, pull_shear, umbrella.
+# Pairwise-additive fixed-charge model only for group/group energy decomposition.
+include common/parameters.in
+variable out index results/adhesion
+variable mode index equilibrium
+variable contact_cut index 4.0
+variable pull_speed index 0.0001
+variable pull_distance index 20.0
+variable zcenter index 10.0
+variable Kspring index 2.0
+units real
+atom_style full
+boundary p p f
+include common/load.in
+kspace_modify slab 3.0
+if "$(count(anchor)) < 1 || $(count(substrate)) < 1 || $(count(polymer)) < 1" then "print 'Need nonempty anchor, substrate and polymer'" "quit 1"
+group mobile subtract all anchor
+velocity anchor set 0.0 0.0 0.0
+fix pin anchor setforce 0.0 0.0 0.0
+compute Tmobile mobile temp
+fix eq mobile nvt temp ${T} ${T} ${Tdamp}
+fix_modify eq temp Tmobile
+thermo_style custom step time c_Tmobile pe ke etotal
+run ${neq}
+unfix eq
+reset_timestep 0
+variable tim equal time
+variable area equal lx*ly
+dump coords all custom ${dump_every} ${out}/trajectory.dump id mol type q xu yu zu fx fy fz
+dump_modify coords sort id
+write_dump polymer custom ${out}/polymer_ids.dump id mol type q mass xu yu zu modify sort id
+write_dump substrate custom ${out}/substrate_ids.dump id mol type q mass xu yu zu modify sort id
+if "${mode} == equilibrium" then "jump SELF equilibrium"
+if "${mode} == pull_normal || ${mode} == pull_shear" then "jump SELF pull"
+if "${mode} == umbrella" then "jump SELF umbrella"
+print "Unknown adhesion mode"
+quit 1
+
+label equilibrium
+compute cross polymer group/group substrate pair yes kspace yes
+compute contacts polymer coord/atom cutoff ${contact_cut} group substrate
+variable touched atom "c_contacts > 0"
+compute frac polymer reduce ave v_touched
+# Only a frozen-geometry cross-interaction density, NOT a free energy or fracture work.
+variable Wcross equal -c_cross/v_area*0.6947695457
+fix prod mobile nvt temp ${T} ${T} ${Tdamp}
+fix_modify prod temp Tmobile
+fix obs all ave/time ${sample} 1 ${sample} v_tim c_cross v_Wcross c_frac v_area file ${out}/interaction.dat
+compute bins all chunk/atom bin/1d z lower 1.0 units box
+fix profile polymer ave/chunk 100 10 1000 bins density/mass file ${out}/polymer_z_density.dat
+run ${nprod}
+write_data ${out}/adsorbed.data nocoeff
+jump SELF end
+
+label pull
+# grip = upper polymer loading atoms selected ONCE from equilibrated configuration.
+# anchor and grip MUST be disjoint. Do NOT setforce grip: its physical force is measured.
+group load_overlap intersect anchor grip
+if "$(count(load_overlap)) > 0" then "print 'anchor and grip overlap'" "quit 1"
+if "$(count(grip)) < 1" then "print 'Empty grip'" "quit 1"
+group mobile clear
+group mobile subtract all anchor grip
+velocity grip set 0.0 0.0 0.0
+uncompute Tmobile
+if "${mode} == pull_normal" then "compute Tload mobile temp/partial 1 1 0" "fix moveGrip grip move linear 0.0 0.0 ${pull_speed} units box"
+if "${mode} == pull_shear" then "compute Tload mobile temp/partial 0 1 1" "fix moveGrip grip move linear ${pull_speed} 0.0 0.0 units box"
+fix prod mobile nvt temp ${T} ${T} ${Tdamp}
+fix_modify prod temp Tload
+compute load grip reduce sum fx fy fz
+variable delta equal time*${pull_speed}
+variable Tn equal -c_load[3]/v_area*6947.695457
+variable Ts equal -c_load[1]/v_area*6947.695457
+fix traction all ave/time ${sample} 1 ${sample} v_tim v_delta v_Tn v_Ts v_area file ${out}/traction.dat
+thermo_style custom step time c_Tload pe v_delta v_Tn v_Ts
+variable nload equal ceil(${pull_distance}/(${pull_speed}*${dtfs}))
+run ${nload}
+write_data ${out}/separated.data nocoeff
+jump SELF end
+
+label umbrella
+if "$(count(probe)) < 1" then "print 'Need a nonempty complete-chain probe'" "quit 1"
+# probe = one complete adsorbing molecule/chain (NOT a geometric slice).
+# zcenter is probe COM minus FIXED anchor COM. Start EACH window near its center.
+# No automatic translation through solvent; provide pre-equilibrated window structures.
+variable zref equal $(xcm(anchor,z))
+variable target equal v_zref+${zcenter}
+variable zcv equal xcm(probe,z)-v_zref
+fix bias probe spring tether ${Kspring} NULL NULL ${target} 0.0
+fix_modify bias energy yes
+fix prod mobile nvt temp ${T} ${T} ${Tdamp}
+fix_modify prod temp Tmobile
+run ${neq}
+fix window all ave/time ${sample} 1 ${sample} v_tim v_zcv f_bias file ${out}/window.dat
+run ${nprod}
+print "center_A=${zcenter} K_kcal_mol_A2=${Kspring} anchor_z_A=${zref}" file ${out}/window_metadata.txt
+write_data ${out}/window_final.data nocoeff
+
+label end
+quit 0

@@ -1,0 +1,2 @@
+print "MODEL NOT CONFIGURED: define atom groups/type variables for YOUR data file."
+quit 1

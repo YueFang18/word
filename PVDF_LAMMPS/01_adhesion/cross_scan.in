@@ -1,0 +1,26 @@
+# lmp -in 01_adhesion/cross_scan.in -var data oligomer_surface.data ...
+# Frozen-geometry adsorption curve to compare with EXACT SAME DFT geometries.
+# Prepare starting separation and orientation in data; no solvent, no bonds across groups.
+include common/parameters.in
+variable out index results/cross_scan
+variable scan_step index 0.2
+variable scan_count index 41
+units real
+atom_style full
+boundary p p f
+include common/load.in
+kspace_modify slab 3.0
+compute cross probe group/group substrate pair yes kspace yes
+variable sep equal xcm(probe,z)-xcm(substrate,z)
+variable energy equal c_cross*0.0433641042
+variable forcez equal c_cross[3]*0.0433641042
+thermo_style custom step pe c_cross v_sep v_energy v_forcez
+print "# COM_separation_A E_cross_eV force_on_probe_z_eV_A" file ${out}/cross_scan.dat
+variable i loop ${scan_count}
+label loop
+run 0
+print "${sep} ${energy} ${forcez}" append ${out}/cross_scan.dat
+displace_atoms probe move 0.0 0.0 ${scan_step} units box
+next i
+jump SELF loop
+quit 0

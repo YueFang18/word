@@ -1,0 +1,24 @@
+# BULK ONLY: no vacuum, no pinned wall. Feed semi-crystalline morphology as constructed.
+include common/parameters.in
+variable out index results/equilibrate
+units real
+atom_style full
+boundary p p p
+include common/load.in
+min_style fire
+minimize 1.0e-8 1.0e-6 5000 50000
+fix eq all npt temp ${T} ${T} ${Tdamp} iso ${P} ${P} ${Pdamp}
+variable tim equal time
+variable rho equal density
+variable boxV equal vol
+variable pot equal pe
+variable H equal enthalpy
+fix bulk all ave/time ${sample} 1 ${sample} v_tim v_rho v_boxV v_pot v_H file ${out}/bulk.dat
+dump coords all custom ${dump_every} ${out}/equilibrate.dump id mol type q xu yu zu
+dump_modify coords sort id
+run ${neq}
+# Production continues NPT here only for equilibrium density/structure, not transport/GK.
+run ${nprod}
+write_data ${out}/equilibrated.data nocoeff
+write_restart ${out}/equilibrated.restart
+print "Equilibration duration is not proof of convergence. Check chain/volume/phase relaxation."

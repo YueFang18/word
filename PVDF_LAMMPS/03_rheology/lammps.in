@@ -1,0 +1,86 @@
+# Equilibrated orthogonal BULK solution/slurry, no vacuum or pinned atoms.
+include common/parameters.in
+variable out index results/rheology
+variable mode index structure
+variable shear_rate index 1.0e-7
+variable corr_every index 10
+variable corr_points index 10000
+variable ensemble index nvt
+units real
+atom_style full
+boundary p p p
+include common/load.in
+fix eq all nvt temp ${T} ${T} ${Tdamp}
+run ${neq}
+unfix eq
+reset_timestep 0
+include common/chain_stats.in
+variable tim equal time
+variable rho equal density
+variable boxV equal vol
+variable enthal equal enthalpy
+variable pot equal pe
+if "${mode} == structure" then "jump SELF structure"
+if "${mode} == adsorption" then "jump SELF adsorption"
+if "${mode} == gk" then "jump SELF gk"
+if "${mode} == nemd" then "jump SELF nemd"
+print "Unknown rheology mode"
+quit 1
+
+label structure
+# Same recipe and state required for comparing density / chain statistics.
+fix prod all nvt temp ${T} ${T} ${Tdamp}
+fix obs all ave/time ${sample} 1 ${sample} v_tim v_rho v_boxV v_pot v_enthal file ${out}/solution.dat
+run ${nprod}
+jump SELF end
+
+label adsorption
+# Bulk periodic nanoparticle suspension. particles group must be distinct from polymer.
+# Whole particles remain dynamic; rigid-body particles need a separate integration design.
+if "$(count(particles)) < 1" then "print 'Need nonempty particles group'" "quit 1"
+compute cross polymer group/group particles pair yes kspace yes
+compute cont polymer coord/atom cutoff 4.0 group particles
+variable touched atom "c_cont > 0"
+compute frac polymer reduce ave v_touched
+fix prod all nvt temp ${T} ${T} ${Tdamp}
+fix obs all ave/time ${sample} 1 ${sample} v_tim c_cross c_frac file ${out}/particle_adsorption.dat
+write_dump polymer custom ${out}/polymer_ids.dump id mol type q mass xu yu zu modify sort id
+write_dump particles custom ${out}/particle_ids.dump id mol type q mass xu yu zu modify sort id
+run ${nprod}
+jump SELF end
+
+label gk
+if "${ensemble} == nvt" then "fix prod all nvt temp ${T} ${T} ${Tdamp}"
+if "${ensemble} == nve" then "fix prod all nve"
+if "${ensemble} != nvt && ${ensemble} != nve" then "print 'ensemble must be nvt or nve'" "quit 1"
+# Instantaneous stress samples, NOT pre-averaged; postprocess subtracts mean stress.
+variable Pxy equal pxy
+variable Pxz equal pxz
+variable Pyz equal pyz
+fix raw all ave/time ${corr_every} 1 ${corr_every} v_tim v_Pxy v_Pxz v_Pyz v_boxV file ${out}/stress_raw.dat
+variable corr_out equal ${corr_every}*${corr_points}
+fix acf all ave/correlate ${corr_every} ${corr_points} ${corr_out} v_Pxy v_Pxz v_Pyz type auto ave running file ${out}/stress_acf_raw.dat
+print "T_K=${T} dt_fs=${dtfs} stress_unit=atm time_unit=fs volume_A3=$(vol)" file ${out}/gk_metadata.txt
+run ${nprod}
+print "Raw LAMMPS ACF is not mean-subtracted. Use analysis/postprocess.py gk on stress_raw.dat; inspect integral plateau and block uncertainty."
+jump SELF end
+
+label nemd
+change_box all triclinic
+# remap v is required by SLLOD. Do not use remap x for this liquid-flow mode.
+fix deformation all deform 1 xy erate ${shear_rate} units box remap v
+fix prod all nvt/sllod temp ${T} ${T} ${Tdamp}
+compute flowT all temp/deform
+compute flowP all pressure flowT
+thermo_modify temp flowT press flowP
+variable eta equal -c_flowP[4]*101325.0/(${shear_rate}*1.0e15)
+variable pxyflow equal c_flowP[4]
+fix obs all ave/time ${sample} 1 ${sample} v_tim v_pxyflow v_eta c_flowT file ${out}/nemd.dat
+compute bins all chunk/atom bin/1d y lower 0.05 units reduced
+fix profile all ave/chunk 100 10 1000 bins vx file ${out}/velocity_profile.dat
+run ${nprod}
+print "Discard startup strain; check linear velocity profile, temperature, steady stress and rate dependence."
+
+label end
+write_data ${out}/final.data nocoeff
+quit 0

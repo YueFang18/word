@@ -1,0 +1,2 @@
+# Optional constraint fixes ONLY, e.g. an independently verified SHAKE selection.
+# Default: flexible bonds, dt=0.5 fs. Verify energy drift before changing timestep.

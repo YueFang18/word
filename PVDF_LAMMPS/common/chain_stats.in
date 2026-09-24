@@ -1,0 +1,13 @@
+# Requires polymer (complete chains) and backbone (PVDF backbone atoms only).
+# Each polymer chain needs a UNIQUE positive molecule-ID and consistent image flags.
+compute chains polymer chunk/atom molecule compress yes
+compute rg polymer gyration/chunk chains
+compute rgt polymer gyration/chunk chains tensor
+fix rgout polymer ave/time ${sample} 1 ${sample} c_rg file ${out}/rg.dat mode vector
+fix rgtout polymer ave/time ${sample} 1 ${sample} c_rgt[*] file ${out}/rg_tensor.dat mode vector
+# Backbone-only torsions, not all H-C-C-H torsions. IDs permit chain-sequence analysis.
+compute bbids backbone property/local dtype datom1 datom2 datom3 datom4
+compute bbphi backbone dihedral/local phi
+dump torsions backbone local ${dump_every} ${out}/backbone_dihedrals.dump index c_bbids[*] c_bbphi
+dump coords all custom ${dump_every} ${out}/trajectory.dump id mol type q mass xu yu zu vx vy vz
+dump_modify coords sort id

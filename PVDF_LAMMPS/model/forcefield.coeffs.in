@@ -1,0 +1,2 @@
+print "MODEL NOT CONFIGURED: supply ALL bonded, nonbonded and cross coefficients."
+quit 1

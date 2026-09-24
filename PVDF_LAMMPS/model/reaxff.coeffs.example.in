@@ -1,0 +1,5 @@
+# Replace with ONE jointly validated reactive parameter set and exact type mapping.
+# pair_coeff * * /path/to/validated.ff C H F O Al
+# variable elements string "C H F O Al"
+print "ReaxFF coefficients and element/type mapping have not been supplied."
+quit 1

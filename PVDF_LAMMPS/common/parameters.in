@@ -1,0 +1,19 @@
+# Defaults are STARTING POINTS, not convergence claims. CLI -var overrides index variables.
+# real: angstrom, fs, kcal/mol, atm, electron charge, g/cm^3.
+variable data index model/system.data
+variable styles index model/forcefield.styles.in
+variable coeffs index model/forcefield.coeffs.in
+variable groups index model/groups.in
+variable hooks index model/hooks.in
+variable T index 300.0
+variable P index 1.0
+variable dtfs index 0.5
+variable Tdamp index 100.0
+variable Pdamp index 1000.0
+variable seed index 492845
+variable neq index 200000
+variable nprod index 2000000
+variable sample index 100
+variable dump_every index 2000
+variable initvel index yes
+# No automatic high-temperature anneal: it would erase the intended crystal morphology.

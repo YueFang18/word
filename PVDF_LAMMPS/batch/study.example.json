@@ -1,0 +1,47 @@
+{
+  "description": "Replace all example chemistry, paths and model metadata. A/B/C are labels, not force-field types.",
+  "models": [
+    {
+      "id": "seq_random_bulk",
+      "sequence_tokens": ["A", "B", "A", "A", "B", "A", "B", "A"],
+      "sequence_definition": "illustrative only; use full per-chain sequences or sequence_files for polydisperse systems",
+      "chemistry": {"A": "VDF", "B": "REPLACE_WITH_ACTUAL_COMONOMER"},
+      "state": "bulk",
+      "composition_basis": "fixed monomer mole fractions; same DP; report resulting molecular mass",
+      "chain_count": null,
+      "Mn_g_mol": null,
+      "Mw_g_mol": null,
+      "crystallinity_target": null,
+      "solvent_mass_fraction": 0.0,
+      "salt_recipe": null,
+      "surface": null,
+      "forcefield_version": "UNASSIGNED",
+      "data": "models/seq_random/bulk.data",
+      "styles": "models/seq_random/styles.in",
+      "coeffs": "models/seq_random/coeffs.in",
+      "groups": "models/seq_random/groups.in",
+      "hooks": "model/hooks.in",
+      "cases": [
+        {"name": "structure_300K", "task": "mechanics", "mode": "structure", "vars": {"T": 300}},
+        {"name": "tension_300K", "task": "mechanics", "mode": "tensile", "vars": {"T": 300, "strain_rate": "1e-7", "maxstrain": 0.05}}
+      ]
+    },
+    {
+      "id": "seq_block_bulk",
+      "sequence_tokens": ["A", "A", "A", "A", "A", "B", "B", "B"],
+      "chemistry": {"A": "VDF", "B": "REPLACE_WITH_ACTUAL_COMONOMER"},
+      "state": "bulk",
+      "forcefield_version": "UNASSIGNED",
+      "data": "models/seq_block/bulk.data",
+      "styles": "models/seq_block/styles.in",
+      "coeffs": "models/seq_block/coeffs.in",
+      "groups": "models/seq_block/groups.in",
+      "hooks": "model/hooks.in",
+      "cases": [
+        {"name": "structure_300K", "task": "mechanics", "mode": "structure", "vars": {"T": 300}},
+        {"name": "tension_300K", "task": "mechanics", "mode": "tensile", "vars": {"T": 300, "strain_rate": "1e-7", "maxstrain": 0.05}}
+      ]
+    }
+  ],
+  "seeds": [192845, 392847, 592849]
+}

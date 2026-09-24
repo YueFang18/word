@@ -1,0 +1,54 @@
+# Fixed-charge, neutral, fully periodic homogeneous system, constant-volume production.
+# Groups: Li (cation sites), anion (COMPLETE anion molecules), donor_poly, donor_solvent, donor_anion.
+include common/parameters.in
+variable out index results/transport
+variable ensemble index nvt
+variable ion_every index 100
+variable coord_cut index 3.0
+# Required RDF atom types/type ranges are defined in YOUR groups.in, e.g. Li_type.
+units real
+atom_style full
+boundary p p p
+include common/load.in
+if "$(count(Li)) < 1 || $(count(anion)) < 1" then "print 'Need Li and full anion groups'" "quit 1"
+compute charge all property/atom q
+compute qsum all reduce sum c_charge
+thermo_style custom step time temp press vol c_qsum
+fix eq all nvt temp ${T} ${T} ${Tdamp}
+run ${neq}
+if "$(abs(c_qsum)) > 1.0e-4" then "print 'Transport system must be neutral'" "quit 1"
+unfix eq
+reset_timestep 0
+velocity all zero linear
+if "${ensemble} == nvt" then "fix prod all nvt temp ${T} ${T} ${Tdamp}"
+if "${ensemble} == nve" then "fix prod all nve"
+if "${ensemble} != nvt && ${ensemble} != nve" then "print 'ensemble must be nvt or nve'" "quit 1"
+# No separate removal of cation/anion COM motion: that would suppress transport.
+compute msdLi Li msd com no average no
+compute ardf all rdf 200 ${Li_type} ${poly_donor_type} ${Li_type} ${solv_donor_type} ${Li_type} ${anion_donor_type}
+fix rdfout all ave/time 100 10 1000 c_ardf[*] file ${out}/rdf.dat mode vector
+# Preliminary cutoff only; choose species-specific cutoffs from RDF first minima later.
+compute cp Li coord/atom cutoff ${coord_cut} group donor_poly
+compute cs Li coord/atom cutoff ${coord_cut} group donor_solvent
+compute ca Li coord/atom cutoff ${coord_cut} group donor_anion
+compute cpm Li reduce ave c_cp
+compute csm Li reduce ave c_cs
+compute cam Li reduce ave c_ca
+variable tim equal time
+variable boxV equal vol
+fix obs all ave/time ${ion_every} 1 ${ion_every} v_tim c_msdLi[1] c_msdLi[2] c_msdLi[3] c_msdLi[4] v_boxV c_cpm c_csm c_cam file ${out}/transport.dat
+# Charge Helfand moment includes ALL atoms with force-field charges, not only Li/anion centers.
+compute unwrapped all property/atom xu yu zu
+variable qx atom q*c_unwrapped[1]
+variable qy atom q*c_unwrapped[2]
+variable qz atom q*c_unwrapped[3]
+compute moment all reduce sum v_qx v_qy v_qz
+fix momout all ave/time ${ion_every} 1 ${ion_every} v_tim c_moment[1] c_moment[2] c_moment[3] v_boxV file ${out}/charge_moment.dat
+dump coords all custom ${ion_every} ${out}/trajectory.dump id mol type q mass xu yu zu
+dump_modify coords sort id
+write_dump Li custom ${out}/Li_ids.dump id mol type q mass xu yu zu modify sort id
+write_dump anion custom ${out}/anion_ids.dump id mol type q mass xu yu zu modify sort id
+print "T_K=${T} dt_fs=${dtfs} sample_steps=${ion_every} volume_A3=$(vol) charge_units=e" file ${out}/transport_metadata.txt
+run ${nprod}
+write_data ${out}/final.data nocoeff
+quit 0

@@ -1,0 +1,18 @@
+# Caller defines units, atom_style, boundary and out; run from PACKAGE ROOT.
+shell mkdir -p ${out}
+log ${out}/log.lammps
+include ${styles}
+read_data ${data} nocoeff
+include ${coeffs}
+include ${groups}
+neighbor 2.0 bin
+neigh_modify delay 0 every 1 check yes
+timestep ${dtfs}
+# Optional SHAKE/etc. This file MUST NOT time-integrate or thermostat any atoms.
+include ${hooks}
+if "${initvel} == yes" then "velocity all create ${T} ${seed} mom yes rot no dist gaussian"
+if "${initvel} != yes && ${initvel} != no" then "print 'initvel must be yes or no'" "quit 1"
+thermo 1000
+thermo_style custom step time temp press density vol pe ke etotal
+thermo_modify flush yes lost error
+print "T_K=${T} dt_fs=${dtfs} seed=${seed} data=${data} styles=${styles} coeffs=${coeffs}" file ${out}/run_metadata.txt
